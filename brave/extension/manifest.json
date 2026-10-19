@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "PC Watchdog Tabs",
+  "version": "1.0",
+  "description": "Lets the PC Watchdog desktop app list your tabs, show their RAM/CPU and sleep or close them.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmC46/Af+gAo+j4w3LPGnUGbiXJRnxa3S3h/m0bfRJqY+fr0vrBQhV98tzid4Tp77HAS2sQ5NnWWSeaqCm39gO/i2CPWMnfzp9Oc4HNyA6Kv30IbkNQk26QGrTesXsAwzulzBN2fiBrVeYEgOAbxs8FxLcYJD9GMIhaHazIzJcWhV8RGVjtY2FG5CzsFaO9ruStghtfCYkQEbmf2SzkGSIyEDAxD755qLhioX30rMF+y/efZCCpOQ1dFnkMGcNdpBNC8vwzA7ZxgRKDLZOgypzNYrrx+PGh2N44PlrIaqWMnpk6sKvZOpxzAM+G7OGBSiKNWVuq3c0l/aa0Zwn+yOiQIDAQAB",
+  "background": { "service_worker": "bg.js" },
+  "permissions": ["tabs", "scripting", "nativeMessaging", "favicon"],
+  "host_permissions": ["<all_urls>"],
+  "icons": { "128": "icon128.png", "48": "icon48.png" }
+}

@@ -1,0 +1,20 @@
+[Unit]
+Description=PC watchdog (anti-freeze memory guard, temp/disk alerts)
+After=systemd-logind.service
+
+[Service]
+Type=notify
+NotifyAccess=all
+ExecStart=/usr/local/bin/pc-watchdog.sh
+Restart=always
+RestartSec=2
+# systemd restarts us if we stop pinging for 30 s
+WatchdogSec=30
+# The kernel OOM killer must never pick us; keep us responsive under load
+OOMScoreAdjust=-1000
+Nice=-10
+IOSchedulingClass=realtime
+MemoryMin=32M
+
+[Install]
+WantedBy=multi-user.target

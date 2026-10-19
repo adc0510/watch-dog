@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# Privileged helper for the PC Watchdog app. Installed to /usr/local/lib/pc-watchdog/pcw-helper
+# and run via pkexec. Only accepts the fixed commands below.
+set -euo pipefail
+PATH=/usr/local/sbin:/usr/local/bin:/usr/bin
+[ "$EUID" -eq 0 ] || { echo "must run as root" >&2; exit 1; }
+SERVICE=pc-watchdog.service
+CONF=/etc/pc-watchdog.conf
+
+case "${1:-}" in
+    start|stop|restart)
+        systemctl "$1" "$SERVICE" ;;
+
+    enable)
+        systemctl enable --now "$SERVICE" ;;
+
+    save-config)
+        # New config arrives on stdin; every line must be a known, safe KEY=VALUE.
+        tmp=$(mktemp)
+        trap 'rm -f "$tmp"' EXIT
+        head -c 8192 > "$tmp"
+        n=0
+        while IFS= read -r line || [ -n "$line" ]; do
+            n=$((n+1))
+            [[ -z $line || $line =~ ^# ]] && continue
+            [[ $line =~ ^(INTERVAL|MEM_MIN_PCT|SWAP_MIN_PCT|PSI_FULL_MAX|PSI_STRIKES|KILL_COOLDOWN|TEMP_WARN|TEMP_CRIT|DISK_MIN_PCT|NOTIFY_COOLDOWN)=[0-9]{1,4}$ ]] && continue
+            [[ $line =~ ^(PREFER_APPS|EXTRA_PROTECT)=\"[A-Za-z0-9._+\ -]{0,1000}\"$ ]] && continue
+            [[ $line =~ ^NOTIFY_USER=\"[a-z_][a-z0-9_-]{0,31}\"$ ]] && continue
+            echo "invalid setting on line $n: $line" >&2; exit 2
+        done < "$tmp"
+        install -m 644 -o root -g root "$tmp" "$CONF"
+        systemctl try-restart "$SERVICE" ;;
+
+    clean-pacman)
+        # keep only the newest version of installed packages, drop uninstalled ones
+        paccache -rk1
+        paccache -ruk0 ;;
+
+    clean-journal)
+        journalctl --vacuum-size=200M ;;
+
+    kill)
+        # kill TERM|KILL|STOP|CONT pid...
+        sig=${2:-}; shift 2 || exit 64
+        [[ $sig =~ ^(TERM|KILL|STOP|CONT)$ ]] || { echo "bad signal" >&2; exit 2; }
+        [ $# -gt 0 ] || exit 64
+        for p in "$@"; do [[ $p =~ ^[0-9]{1,8}$ ]] && (( p > 1 )) || { echo "bad pid $p" >&2; exit 2; }; done
+        kill -s "$sig" "$@" ;;
+
+    renice)
+        # renice N pid...   (N between -5 and 19)
+        n=${2:-}; shift 2 || exit 64
+        [[ $n =~ ^-?[0-9]{1,2}$ ]] && (( n >= -5 && n <= 19 )) || { echo "bad priority" >&2; exit 2; }
+        for p in "$@"; do [[ $p =~ ^[0-9]{1,8}$ ]] && (( p > 1 )) || { echo "bad pid $p" >&2; exit 2; }; done
+        renice -n "$n" -p "$@" >/dev/null ;;
+
+    uninstall)
+        systemctl disable --now "$SERVICE" 2>/dev/null || true
+        rm -f /usr/local/bin/pc-watchdog.sh /etc/systemd/system/$SERVICE \
+              /etc/systemd/system.conf.d/10-hw-watchdog.conf /etc/sysctl.d/90-pc-watchdog.conf \
+              /etc/polkit-1/rules.d/50-pc-watchdog.rules \
+              /usr/share/polkit-1/actions/io.github.pcwatchdog.policy
+        systemctl daemon-reload
+        systemctl daemon-reexec
+        sysctl --system >/dev/null
+        rm -rf /usr/local/lib/pc-watchdog ;;
+
+    *)
+        echo "usage: pcw-helper start|stop|restart|enable|save-config|clean-pacman|clean-journal|kill|renice|uninstall" >&2
+        exit 64 ;;
+esac
